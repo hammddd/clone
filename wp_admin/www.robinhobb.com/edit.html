@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Blog Post</title>
+    <style>
+        /* Basic styling for the form and buttons */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .form-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            max-width: 600px;
+            margin: 0 auto;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            height: 100px;
+        }
+
+        .submit-btn {
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+
+        .submit-btn:hover {
+            background-color: #218838;
+        }
+
+        /* Styling for the suggestions dropdown */
+        .suggestions {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            max-height: 150px;
+            overflow-y: auto;
+            background-color: #fff;
+            position: absolute;
+            z-index: 1000;
+            width: calc(100% - 20px);
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .suggestions div {
+            padding: 8px;
+            cursor: pointer;
+        }
+
+        .suggestions div:hover {
+            background-color: #f4f4f4;
+        }
+
+        /* Styling for tags container */
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 5px;
+        }
+
+        .tag {
+            background-color: #007bff;
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+        }
+
+        .tag .remove-tag {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 12px;
+            margin-left: 8px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="form-container">
+        <h2>Edit Blog Post</h2>
+        <form id="editPostForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="title">Title</label>
+                <input type="text" id="title" name="title" required>
+            </div>
+            <div class="form-group">
+                <label for="post_date">Post Date</label>
+                <input type="date" id="post_date" name="post_date" required>
+            </div>
+            <div class="form-group">
+                <label for="image">Upload Image</label>
+                <input type="file" id="image" name="image" accept="image/*">
+            </div>
+            <div class="form-group">
+                <label for="caption">Caption</label>
+                <input type="text" id="caption" name="caption">
+            </div>
+            <div class="form-group">
+                <label for="content">Content</label>
+                <textarea id="content" name="content" required></textarea>
+            </div>
+            <div class="form-group" style="position: relative;">
+                <label for="tags">Tags</label>
+                <input type="text" id="tags-input-edit" placeholder="Start typing to add tags...">
+                <div id="suggestions-edit" class="suggestions"></div>
+                <div id="tags-container-edit" class="tags-container"></div>
+            </div>
+            <button type="submit" class="submit-btn">Submit</button>
+        </form>
+    </div>
+
+    <script>
+        async function loadBlogPost(postId) {
+            try {
+                const response = await fetch(`http://localhost/clone/backend/index.php/blog?id=${postId}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const post = await response.json();
+
+                document.getElementById("title").value = post.title;
+                document.getElementById("post_date").value = post.post_date;
+                document.getElementById("caption").value = post.caption;
+                document.getElementById("content").value = post.content;
+                //post.tags.forEach(tag => addTagEdit(tag));  // Load tags into the tags container
+
+            } catch (error) {
+                console.error('Error loading blog post:', error);
+                alert("Failed to load the blog post.");
+            }
+        }
+
+        const tagsInputEdit = document.getElementById("tags-input-edit");
+        const suggestionsEdit = document.getElementById("suggestions-edit");
+        const tagsContainerEdit = document.getElementById("tags-container-edit");
+        let selectedTagsEdit = [];
+
+        tagsInputEdit.addEventListener("input", function () {
+            const query = tagsInputEdit.value.toLowerCase().trim();
+            if (query.length > 0) {
+                fetch(`http://localhost/clone/backend/index.php/tags`)
+                    .then(response => response.json())
+                    .then(data => {
+                        suggestionsEdit.innerHTML = "";
+                        const matchedTags = data.filter(tag => tag.tag_name.toLowerCase().includes(query));
+                        matchedTags.forEach(tag => {
+                            const div = document.createElement("div");
+                            div.textContent = tag.tag_name;
+                            div.addEventListener("click", function () {
+                                // Add selected tag and clear input
+                                addTagEdit(tag.tag_name);
+                                tagsInputEdit.value = "";
+                                suggestionsEdit.innerHTML = "";  // Clear suggestions
+                            });
+                            suggestionsEdit.appendChild(div);
+                        });
+                        if (matchedTags.length > 0) {
+                            const clearDiv = document.createElement("div");
+                            clearDiv.textContent = "Clear suggestions";
+                            clearDiv.className = "clear-suggestions";
+                            clearDiv.addEventListener("click", function () {
+                                suggestionsEdit.innerHTML = "";
+                            });
+                            suggestionsEdit.appendChild(clearDiv);
+                        }
+                    });
+            } else {
+                suggestionsEdit.innerHTML = "";
+            }
+        });
+
+        function addTagEdit(tagName) {
+            if (!selectedTagsEdit.includes(tagName)) {
+                selectedTagsEdit.push(tagName);
+                renderTagsEdit();
+            }
+        }
+
+        function removeTagEdit(tagName) {
+            selectedTagsEdit = selectedTagsEdit.filter(tag => tag !== tagName);
+            renderTagsEdit();
+        }
+
+        function renderTagsEdit() {
+            tagsContainerEdit.innerHTML = "";
+            selectedTagsEdit.forEach(tag => {
+                const tagDiv = document.createElement("div");
+                tagDiv.className = "tag";
+                tagDiv.textContent = tag;
+
+                const removeBtn = document.createElement("button");
+                removeBtn.className = "remove-tag";
+                removeBtn.textContent = "x";
+                removeBtn.addEventListener("click", function () {
+                    removeTagEdit(tag);
+                });
+
+                tagDiv.appendChild(removeBtn);
+                tagsContainerEdit.appendChild(tagDiv);
+            });
+        }
+
+        document.getElementById("editPostForm").addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const postId = new URLSearchParams(window.location.search).get('id');
+            const formData = new FormData(document.getElementById("editPostForm"));
+            formData.append("tags", selectedTagsEdit.join(',')); // Append tags as a comma-separated string
+
+            fetch(`http://localhost/clone/backend/index.php/blog?id=${postId}`, {
+                method: "POST",
+                body: formData,
+            })
+            .then((response) => response.json())
+            .then((data) => {
+                if (data.message === "Blog post updated successfully!") {
+                    alert("Blog post updated successfully!");
+                    window.location.href = "blog.html"; // Redirect to the main blog page
+                } else {
+                    alert("Failed to update blog post.");
+                }
+            })
+            .catch((error) => {
+                console.error("Error:", error);
+                alert("An error occurred while updating the blog post.");
+            });
+        });
+
+        // Load the blog post data when the page loads
+        const postId = new URLSearchParams(window.location.search).get('id');
+        if (postId) {
+            loadBlogPost(postId);
+        }
+    </script>
+
+</body>
+</html>
